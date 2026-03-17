@@ -317,14 +317,6 @@ static int colormodechanged;
 
 /* configuration, allows nested code to access above variables */
 #include "config.h"
-for (i = 0; i < CurLast; i++)
-  drw_cur_free(drw, cursor[i]);
-for (i = 0; i < LENGTH(colorsdark); i++) {
-  free(schemedark[i]);
-  free(schemelight[i]);
-}
-free(schemedark);
-free(schemelight);
 
 /* compile-time check if all tags fit into an unsigned int bit array. */
 struct NumTags {
@@ -531,7 +523,7 @@ void cleanup(void) {
     cleanupmon(mons);
   for (i = 0; i < CurLast; i++)
     drw_cur_free(drw, cursor[i]);
-  for (i = 0; i < LENGTH(colors); i++)
+  for (i = 0; i < LENGTH(colorsdark); i++)
     drw_scm_free(drw, scheme[i], 3);
   free(scheme);
   XDestroyWindow(dpy, wmcheckwin);
