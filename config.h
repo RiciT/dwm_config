@@ -84,7 +84,7 @@ static char dmenumon[2] =
 static const char *dmenucmd[] = {
     "dmenu_run", "-m",      dmenumon, "-fn",    dmenufont, "-nb",     col_gray1,
     "-nf",       col_gray3, "-sb",    col_cyan, "-sf",     col_gray4, NULL};
-static const char *termcmd[] = {"terminal", NULL};
+static const char *termcmd[] = {"terminator", NULL};
 
 static const Key keys[] = {
     /* modifier                     key        function        argument */
