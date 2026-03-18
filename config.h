@@ -34,7 +34,7 @@ static const char *colorslight[][3] = {
 };
 
 /* tagging */
-static const char *tags[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
+static const char *tags[] = {"1", "2", "3", "4", "5"};
 
 static const Rule rules[] = {
     /* xprop(1):
@@ -43,7 +43,7 @@ static const Rule rules[] = {
      */
     /* class      instance    title       tags mask     isfloating   monitor */
     {"Gimp", NULL, NULL, 0, 1, -1},
-    {"Firefox", NULL, NULL, 1 << 8, 0, -1},
+    {"Doublecmd", NULL, NULL, 0, 0, -1},
 };
 
 /* layout(s) */
@@ -81,7 +81,7 @@ static const Layout layouts[] = {
 static char dmenumon[2] = "0"; /* component of dmenu{dark,light}, manipulated in spawndmenu() */
 static const char *dmenudark[] =  { "dmenu_run", "-m", dmenumon, "-i", "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
 static const char *dmenulight[] = { "dmenu_run", "-m", dmenumon, "-i", "-fn", dmenufont, "-nb", col_gray3, "-nf", col_gray1, "-sb", col_cyan, "-sf", col_gray4, NULL };
-static const char *termcmd[] = {"terminal", NULL};
+static const char *termcmd[] = {"terminator", NULL};
 
 static const Key keys[] = {
     /* modifier                     key        function        argument */
