@@ -1,5 +1,55 @@
---- dwm.c
-+++ dwm.c
+From 9b5719969ce85c3ecc0238d49c0255c5c2cc79f0 Mon Sep 17 00:00:00 2001
+From: mihirlad55 <mihirlad55@gmail.com>
+Date: Mon, 10 Aug 2020 01:39:28 +0000
+Subject: [PATCH] Add support for managing external status bars
+
+This patch allows dwm to manage other status bars such as
+polybar/lemonbar without them needing to set override-redirect. For
+all intents and purposes, DWM treats this bar as if it were its own
+and as a result helps the status bar and DWM live in harmony.
+
+This has a few advantages
+* The bar does not block fullscreen windows
+* DWM makes room for the status bar, so windows do not overlap the bar
+* The bar can be hidden/killed and DWM will not keep an unsightly gap
+  where the bar was
+* DWM receives EnterNotify events when your cursor enters the bar
+
+To use another status bar, set usealtbar to 1 in your config.h and set
+altbarclass to the class name (can be found using xprop) to the class
+name of your status bar. Also make sure that if your status bar will
+be displayed on top, topbar is set to 1 in your config, and if it will
+be displayed on bottom, topbar is set to 0. This patch does not
+support bars that are not docked at the top or at the bottom of your
+monitor.
+
+This verison of the patch fixes handling of polybar's tray.
+
+The patch is developed at https://github.com/mihirlad55/dwm-anybar
+---
+ config.def.h |   4 ++
+ dwm.c        | 192 +++++++++++++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 181 insertions(+), 15 deletions(-)
+
+diff --git a/config.def.h b/config.def.h
+index 1c0b587..f45211b 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -5,6 +5,10 @@ static const unsigned int borderpx  = 1;        /* border pixel of windows */
+ static const unsigned int snap      = 32;       /* snap pixel */
+ static const int showbar            = 1;        /* 0 means no bar */
+ static const int topbar             = 1;        /* 0 means bottom bar */
++static const int usealtbar          = 1;        /* 1 means use non-dwm status bar */
++static const char *altbarclass      = "Polybar"; /* Alternate bar class name */
++static const char *alttrayname      = "tray";    /* Polybar tray instance name */
++static const char *altbarcmd        = "$HOME/bar.sh"; /* Alternate bar launch command */
+ static const char *fonts[]          = { "monospace:size=10" };
+ static const char dmenufont[]       = "monospace:size=10";
+ static const char col_gray1[]       = "#222222";
+diff --git a/dwm.c b/dwm.c
+index 9fd0286..c1d8ce0 100644
+--- a/dwm.c
++++ b/dwm.c
 @@ -47,8 +47,8 @@
  /* macros */
  #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
@@ -29,7 +79,24 @@
  	const Layout *lt[2];
  };
  
-@@ -210,6 +215,7 @@ static void seturgent(Client *c, int urg);
+@@ -179,6 +181,8 @@ static void incnmaster(const Arg *arg);
+ static void keypress(XEvent *e);
+ static void killclient(const Arg *arg);
+ static void manage(Window w, XWindowAttributes *wa);
++static void managealtbar(Window win, XWindowAttributes *wa);
++static void managetray(Window win, XWindowAttributes *wa);
+ static void mappingnotify(XEvent *e);
+ static void maprequest(XEvent *e);
+ static void monocle(Monitor *m);
+@@ -195,6 +199,7 @@ static void resizemouse(const Arg *arg);
+ static void restack(Monitor *m);
+ static void run(void);
+ static void scan(void);
++static void scantray(void);
+ static int sendevent(Client *c, Atom proto);
+ static void sendmon(Client *c, Monitor *m);
+ static void setclientstate(Client *c, long state);
+@@ -207,6 +212,7 @@ static void seturgent(Client *c, int urg);
  static void showhide(Client *c);
  static void sigchld(int unused);
  static void spawn(const Arg *arg);
@@ -37,7 +104,24 @@
  static void tag(const Arg *arg);
  static void tagmon(const Arg *arg);
  static void tile(Monitor *);
-@@ -511,8 +520,10 @@ cleanupmon(Monitor *mon)
+@@ -216,6 +222,8 @@ static void toggletag(const Arg *arg);
+ static void toggleview(const Arg *arg);
+ static void unfocus(Client *c, int setfocus);
+ static void unmanage(Client *c, int destroyed);
++static void unmanagealtbar(Window w);
++static void unmanagetray(Window w);
+ static void unmapnotify(XEvent *e);
+ static void updatebarpos(Monitor *m);
+ static void updatebars(void);
+@@ -230,6 +238,7 @@ static void updatewmhints(Client *c);
+ static void view(const Arg *arg);
+ static Client *wintoclient(Window w);
+ static Monitor *wintomon(Window w);
++static int wmclasscontains(Window win, const char *class, const char *name);
+ static int xerror(Display *dpy, XErrorEvent *ee);
+ static int xerrordummy(Display *dpy, XErrorEvent *ee);
+ static int xerrorstart(Display *dpy, XErrorEvent *ee);
+@@ -505,8 +514,10 @@ cleanupmon(Monitor *mon)
  		for (m = mons; m && m->next != mon; m = m->next);
  		m->next = mon->next;
  	}
@@ -50,7 +134,7 @@
  	free(mon);
  }
  
-@@ -574,7 +585,7 @@ configurenotify(XEvent *e)
+@@ -568,7 +579,7 @@ configurenotify(XEvent *e)
  				for (c = m->clients; c; c = c->next)
  					if (c->isfullscreen)
  						resizeclient(c, m->mx, m->my, m->mw, m->mh);
@@ -59,7 +143,7 @@
  			}
  			focus(NULL);
  			arrange(NULL);
-@@ -645,6 +656,7 @@ createmon(void)
+@@ -639,6 +650,7 @@ createmon(void)
  	m->nmaster = nmaster;
  	m->showbar = showbar;
  	m->topbar = topbar;
@@ -67,7 +151,7 @@
  	m->lt[0] = &layouts[0];
  	m->lt[1] = &layouts[1 % LENGTH(layouts)];
  	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
-@@ -655,10 +667,15 @@ void
+@@ -649,10 +661,15 @@ void
  destroynotify(XEvent *e)
  {
  	Client *c;
@@ -83,7 +167,7 @@
  }
  
  void
-@@ -702,6 +719,9 @@ dirtomon(int dir)
+@@ -696,6 +713,9 @@ dirtomon(int dir)
  void
  drawbar(Monitor *m)
  {
@@ -93,7 +177,7 @@
  	int x, w, tw = 0;
  	int boxs = drw->fonts->h / 9;
  	int boxw = drw->fonts->h / 6 + 2;
-@@ -1083,6 +1103,45 @@ manage(Window w, XWindowAttributes *wa)
+@@ -1077,6 +1097,45 @@ manage(Window w, XWindowAttributes *wa)
  	focus(NULL);
  }
  
@@ -139,7 +223,7 @@
  void
  mappingnotify(XEvent *e)
  {
-@@ -1103,7 +1162,9 @@ maprequest(XEvent *e)
+@@ -1097,7 +1156,9 @@ maprequest(XEvent *e)
  		return;
  	if (wa.override_redirect)
  		return;
@@ -150,7 +234,7 @@
  		manage(ev->window, &wa);
  }
  
-@@ -1399,7 +1460,9 @@ scan(void)
+@@ -1393,7 +1454,9 @@ scan(void)
  			if (!XGetWindowAttributes(dpy, wins[i], &wa)
  			|| wa.override_redirect || XGetTransientForHint(dpy, wins[i], &d1))
  				continue;
@@ -161,7 +245,7 @@
  				manage(wins[i], &wa);
  		}
  		for (i = 0; i < num; i++) { /* now the transients */
-@@ -1414,6 +1477,29 @@ scan(void)
+@@ -1408,6 +1471,29 @@ scan(void)
  	}
  }
  
@@ -191,7 +275,7 @@
  void
  sendmon(Client *c, Monitor *m)
  {
-@@ -1552,7 +1638,7 @@ setup(void)
+@@ -1546,7 +1632,7 @@ setup(void)
  	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
  		die("no fonts could be loaded.");
  	lrpad = drw->fonts->h;
@@ -200,7 +284,7 @@
  	updategeom();
  	/* init atoms */
  	utf8string = XInternAtom(dpy, "UTF8_STRING", False);
-@@ -1601,6 +1687,7 @@ setup(void)
+@@ -1595,6 +1681,7 @@ setup(void)
  	XSelectInput(dpy, root, wa.event_mask);
  	grabkeys();
  	focus(NULL);
@@ -208,7 +292,7 @@
  }
  
  
-@@ -1659,6 +1746,13 @@ spawn(const Arg *arg)
+@@ -1653,6 +1740,13 @@ spawn(const Arg *arg)
  	}
  }
  
@@ -222,7 +306,7 @@
  void
  tag(const Arg *arg)
  {
-@@ -1708,9 +1802,18 @@ tile(Monitor *m)
+@@ -1702,9 +1796,18 @@ tile(Monitor *m)
  void
  togglebar(const Arg *arg)
  {
@@ -242,7 +326,7 @@
  	arrange(selmon);
  }
  
-@@ -1793,10 +1896,41 @@ unmanage(Client *c, int destroyed)
+@@ -1787,10 +1890,41 @@ unmanage(Client *c, int destroyed)
  	arrange(m);
  }
  
@@ -284,7 +368,7 @@
  	XUnmapEvent *ev = &e->xunmap;
  
  	if ((c = wintoclient(ev->window))) {
-@@ -1804,12 +1938,18 @@ unmapnotify(XEvent *e)
+@@ -1798,12 +1932,18 @@ unmapnotify(XEvent *e)
  			setclientstate(c, WithdrawnState);
  		else
  			unmanage(c, 0);
@@ -304,7 +388,7 @@
  	Monitor *m;
  	XSetWindowAttributes wa = {
  		.override_redirect = True,
-@@ -1835,11 +1975,11 @@ updatebarpos(Monitor *m)
+@@ -1829,11 +1969,11 @@ updatebarpos(Monitor *m)
  	m->wy = m->my;
  	m->wh = m->mh;
  	if (m->showbar) {
@@ -319,7 +403,7 @@
  }
  
  void
-@@ -2076,13 +2216,35 @@ wintomon(Window w)
+@@ -2070,13 +2210,35 @@ wintomon(Window w)
  	if (w == root && getrootptr(&x, &y))
  		return recttomon(x, y, 1, 1);
  	for (m = mons; m; m = m->next)
@@ -356,3 +440,6 @@
  /* There's no way to check accesses to destroyed windows, thus those cases are
   * ignored (especially on UnmapNotify's). Other types of errors call Xlibs
   * default error handler, which may call exit. */
+-- 
+2.28.0
+
