@@ -1,358 +1,89 @@
 --- dwm.c
 +++ dwm.c
-@@ -47,8 +47,8 @@
- /* macros */
- #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
- #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
--#define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
--                               * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
-+#define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->mx+(m)->mw) - MAX((x),(m)->mx)) \
-+                               * MAX(0, MIN((y)+(h),(m)->my+(m)->mh) - MAX((y),(m)->my)))
- #define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
- #define LENGTH(X)               (sizeof X / sizeof X[0])
- #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
-@@ -116,7 +116,8 @@ struct Monitor {
- 	float mfact;
- 	int nmaster;
- 	int num;
--	int by;               /* bar geometry */
-+	int by, bh;           /* bar geometry */
-+	int tx, tw;           /* bar tray geometry */
- 	int mx, my, mw, mh;   /* screen size */
- 	int wx, wy, ww, wh;   /* window area  */
- 	unsigned int seltags;
-@@ -129,6 +130,7 @@ struct Monitor {
- 	Client *stack;
- 	Monitor *next;
- 	Window barwin;
-+	Window traywin;
- 	const Layout *lt[2];
- };
+@@ -36,6 +36,7 @@
+ #include <X11/Xlib.h>
+ #include <X11/Xproto.h>
+ #include <X11/Xutil.h>
++#include <X11/Xresource.h>
+ #ifdef XINERAMA
+ #include <X11/extensions/Xinerama.h>
+ #endif /* XINERAMA */
+@@ -247,6 +261,8 @@ static int xerror(Display *dpy, XErrorEvent *ee);
+ static int xerrordummy(Display *dpy, XErrorEvent *ee);
+ static int xerrorstart(Display *dpy, XErrorEvent *ee);
+ static void zoom(const Arg *arg);
++static void load_xresources(void);
++static void resource_load(XrmDatabase db, char *name, enum resource_type rtype, void *dst);
  
-@@ -210,6 +215,7 @@ static void seturgent(Client *c, int urg);
- static void showhide(Client *c);
- static void sigchld(int unused);
- static void spawn(const Arg *arg);
-+static void spawnbar();
- static void tag(const Arg *arg);
- static void tagmon(const Arg *arg);
- static void tile(Monitor *);
-@@ -511,8 +520,10 @@ cleanupmon(Monitor *mon)
- 		for (m = mons; m && m->next != mon; m = m->next);
- 		m->next = mon->next;
- 	}
--	XUnmapWindow(dpy, mon->barwin);
--	XDestroyWindow(dpy, mon->barwin);
-+	if (!usealtbar) {
-+		XUnmapWindow(dpy, mon->barwin);
-+		XDestroyWindow(dpy, mon->barwin);
-+	}
- 	free(mon);
- }
- 
-@@ -574,7 +585,7 @@ configurenotify(XEvent *e)
- 				for (c = m->clients; c; c = c->next)
- 					if (c->isfullscreen)
- 						resizeclient(c, m->mx, m->my, m->mw, m->mh);
--				XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
-+				XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, m->bh);
- 			}
- 			focus(NULL);
- 			arrange(NULL);
-@@ -645,6 +656,7 @@ createmon(void)
- 	m->nmaster = nmaster;
- 	m->showbar = showbar;
- 	m->topbar = topbar;
-+	m->bh = bh;
- 	m->lt[0] = &layouts[0];
- 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
- 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
-@@ -655,10 +667,15 @@ void
- destroynotify(XEvent *e)
- {
- 	Client *c;
-+	Monitor *m;
- 	XDestroyWindowEvent *ev = &e->xdestroywindow;
- 
- 	if ((c = wintoclient(ev->window)))
- 		unmanage(c, 1);
-+	else if ((m = wintomon(ev->window)) && m->barwin == ev->window)
-+		unmanagealtbar(ev->window);
-+	else if (m->traywin == ev->window)
-+		unmanagetray(ev->window);
- }
- 
- void
-@@ -702,6 +719,9 @@ dirtomon(int dir)
- void
- drawbar(Monitor *m)
- {
-+	if (usealtbar)
-+		return;
-+
- 	int x, w, tw = 0;
- 	int boxs = drw->fonts->h / 9;
- 	int boxw = drw->fonts->h / 6 + 2;
-@@ -1083,6 +1103,45 @@ manage(Window w, XWindowAttributes *wa)
- 	focus(NULL);
+ /* variables */
+ static const char broken[] = "broken";
+@@ -2140,6 +2156,60 @@ zoom(const Arg *arg)
+ 	pop(c);
  }
  
 +void
-+managealtbar(Window win, XWindowAttributes *wa)
++resource_load(XrmDatabase db, char *name, enum resource_type rtype, void *dst)
 +{
-+	Monitor *m;
-+	if (!(m = recttomon(wa->x, wa->y, wa->width, wa->height)))
-+		return;
++	char *sdst = NULL;
++	int *idst = NULL;
++	float *fdst = NULL;
 +
-+	m->barwin = win;
-+	m->by = wa->y;
-+	bh = m->bh = wa->height;
-+	updatebarpos(m);
-+	arrange(m);
-+	XSelectInput(dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
-+	XMoveResizeWindow(dpy, win, wa->x, wa->y, wa->width, wa->height);
-+	XMapWindow(dpy, win);
-+	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
-+		(unsigned char *) &win, 1);
-+}
++	sdst = dst;
++	idst = dst;
++	fdst = dst;
 +
-+void
-+managetray(Window win, XWindowAttributes *wa)
-+{
-+	Monitor *m;
-+	if (!(m = recttomon(wa->x, wa->y, wa->width, wa->height)))
-+		return;
++	char fullname[256];
++	char *type;
++	XrmValue ret;
 +
-+	m->traywin = win;
-+	m->tx = wa->x;
-+	m->tw = wa->width;
-+	updatebarpos(m);
-+	arrange(m);
-+	XSelectInput(dpy, win, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
-+	XMoveResizeWindow(dpy, win, wa->x, wa->y, wa->width, wa->height);
-+	XMapWindow(dpy, win);
-+	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
-+			(unsigned char *) &win, 1);
-+}
++	snprintf(fullname, sizeof(fullname), "%s.%s", "dwm", name);
++	fullname[sizeof(fullname) - 1] = '\0';
 +
-+
- void
- mappingnotify(XEvent *e)
- {
-@@ -1103,7 +1162,9 @@ maprequest(XEvent *e)
- 		return;
- 	if (wa.override_redirect)
- 		return;
--	if (!wintoclient(ev->window))
-+	if (wmclasscontains(ev->window, altbarclass, ""))
-+		managealtbar(ev->window, &wa);
-+	else if (!wintoclient(ev->window))
- 		manage(ev->window, &wa);
- }
- 
-@@ -1399,7 +1460,9 @@ scan(void)
- 			if (!XGetWindowAttributes(dpy, wins[i], &wa)
- 			|| wa.override_redirect || XGetTransientForHint(dpy, wins[i], &d1))
- 				continue;
--			if (wa.map_state == IsViewable || getstate(wins[i]) == IconicState)
-+			if (wmclasscontains(wins[i], altbarclass, ""))
-+				managealtbar(wins[i], &wa);
-+			else if (wa.map_state == IsViewable || getstate(wins[i]) == IconicState)
- 				manage(wins[i], &wa);
- 		}
- 		for (i = 0; i < num; i++) { /* now the transients */
-@@ -1414,6 +1477,29 @@ scan(void)
- 	}
- }
- 
-+void
-+scantray(void)
-+{
-+	unsigned int num;
-+	Window d1, d2, *wins = NULL;
-+	XWindowAttributes wa;
-+
-+	if (XQueryTree(dpy, root, &d1, &d2, &wins, &num)) {
-+		for (unsigned int i = 0; i < num; i++) {
-+			if (wmclasscontains(wins[i], altbarclass, alttrayname)) {
-+				if (!XGetWindowAttributes(dpy, wins[i], &wa))
-+					break;
-+				managetray(wins[i], &wa);
-+			}
++	XrmGetResource(db, fullname, "*", &type, &ret);
++	if (!(ret.addr == NULL || strncmp("String", type, 64)))
++	{
++		switch (rtype) {
++		case STRING:
++			strcpy(sdst, ret.addr);
++			break;
++		case INTEGER:
++			*idst = strtoul(ret.addr, NULL, 10);
++			break;
++		case FLOAT:
++			*fdst = strtof(ret.addr, NULL);
++			break;
 +		}
 +	}
-+
-+	if (wins)
-+		XFree(wins);
-+}
-+
-+
-+
- void
- sendmon(Client *c, Monitor *m)
- {
-@@ -1552,7 +1638,7 @@ setup(void)
- 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
- 		die("no fonts could be loaded.");
- 	lrpad = drw->fonts->h;
--	bh = drw->fonts->h + 2;
-+	bh = usealtbar ? 0 : drw->fonts->h + 2;
- 	updategeom();
- 	/* init atoms */
- 	utf8string = XInternAtom(dpy, "UTF8_STRING", False);
-@@ -1601,6 +1687,7 @@ setup(void)
- 	XSelectInput(dpy, root, wa.event_mask);
- 	grabkeys();
- 	focus(NULL);
-+	spawnbar();
- }
- 
- 
-@@ -1659,6 +1746,13 @@ spawn(const Arg *arg)
- 	}
- }
- 
-+void
-+spawnbar()
-+{
-+	if (*altbarcmd)
-+		system(altbarcmd);
-+}
-+
- void
- tag(const Arg *arg)
- {
-@@ -1708,9 +1802,18 @@ tile(Monitor *m)
- void
- togglebar(const Arg *arg)
- {
-+	/**
-+     * Polybar tray does not raise maprequest event. It must be manually scanned
-+	 * for. Scanning it too early while the tray is being populated would give
-+	 * wrong dimensions.
-+     */
-+	if (!selmon->traywin)
-+		scantray();
-+
- 	selmon->showbar = !selmon->showbar;
- 	updatebarpos(selmon);
--	XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww, bh);
-+	XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww, selmon->bh);
-+	XMoveResizeWindow(dpy, selmon->traywin, selmon->tx, selmon->by, selmon->tw, selmon->bh);
- 	arrange(selmon);
- }
- 
-@@ -1793,10 +1896,41 @@ unmanage(Client *c, int destroyed)
- 	arrange(m);
- }
- 
-+void
-+unmanagealtbar(Window w)
-+{
-+    Monitor *m = wintomon(w);
-+
-+    if (!m)
-+        return;
-+
-+    m->barwin = 0;
-+    m->by = 0;
-+    m->bh = 0;
-+    updatebarpos(m);
-+    arrange(m);
 +}
 +
 +void
-+unmanagetray(Window w)
++load_xresources(void)
 +{
-+	Monitor *m = wintomon(w);
++	Display *display;
++	char *resm;
++	XrmDatabase db;
++	ResourcePref *p;
 +
-+	if (!m)
++	display = XOpenDisplay(NULL);
++	resm = XResourceManagerString(display);
++	if (!resm)
 +		return;
 +
-+	m->traywin = 0;
-+	m->tx = 0;
-+	m->tw = 0;
-+	updatebarpos(m);
-+	arrange(m);
++	db = XrmGetStringDatabase(resm);
++	for (p = resources; p < resources + LENGTH(resources); p++)
++		resource_load(db, p->name, p->type, p->dst);
++	XCloseDisplay(display);
 +}
 +
- void
- unmapnotify(XEvent *e)
+ int
+ main(int argc, char *argv[])
  {
- 	Client *c;
-+	Monitor *m;
- 	XUnmapEvent *ev = &e->xunmap;
- 
- 	if ((c = wintoclient(ev->window))) {
-@@ -1804,12 +1938,18 @@ unmapnotify(XEvent *e)
- 			setclientstate(c, WithdrawnState);
- 		else
- 			unmanage(c, 0);
--	}
-+	} else if ((m = wintomon(ev->window)) && m->barwin == ev->window)
-+		unmanagealtbar(ev->window);
-+	else if (m->traywin == ev->window)
-+		unmanagetray(ev->window);
- }
- 
- void
- updatebars(void)
- {
-+	if (usealtbar)
-+		return;
-+
- 	Monitor *m;
- 	XSetWindowAttributes wa = {
- 		.override_redirect = True,
-@@ -1835,11 +1975,11 @@ updatebarpos(Monitor *m)
- 	m->wy = m->my;
- 	m->wh = m->mh;
- 	if (m->showbar) {
--		m->wh -= bh;
-+		m->wh -= m->bh;
- 		m->by = m->topbar ? m->wy : m->wy + m->wh;
--		m->wy = m->topbar ? m->wy + bh : m->wy;
-+		m->wy = m->topbar ? m->wy + m->bh : m->wy;
- 	} else
--		m->by = -bh;
-+		m->by = -m->bh;
- }
- 
- void
-@@ -2076,13 +2216,35 @@ wintomon(Window w)
- 	if (w == root && getrootptr(&x, &y))
- 		return recttomon(x, y, 1, 1);
- 	for (m = mons; m; m = m->next)
--		if (w == m->barwin)
-+		if (w == m->barwin || w == m->traywin)
- 			return m;
- 	if ((c = wintoclient(w)))
- 		return c->mon;
- 	return selmon;
- }
- 
-+int
-+wmclasscontains(Window win, const char *class, const char *name)
-+{
-+	XClassHint ch = { NULL, NULL };
-+	int res = 1;
-+
-+	if (XGetClassHint(dpy, win, &ch)) {
-+		if (ch.res_name && strstr(ch.res_name, name) == NULL)
-+			res = 0;
-+		if (ch.res_class && strstr(ch.res_class, class) == NULL)
-+			res = 0;
-+	} else
-+		res = 0;
-+
-+	if (ch.res_class)
-+		XFree(ch.res_class);
-+	if (ch.res_name)
-+		XFree(ch.res_name);
-+
-+	return res;
-+}
-+
- /* There's no way to check accesses to destroyed windows, thus those cases are
-  * ignored (especially on UnmapNotify's). Other types of errors call Xlibs
-  * default error handler, which may call exit. */
+@@ -2152,6 +2222,8 @@ main(int argc, char *argv[])
+ 	if (!(dpy = XOpenDisplay(NULL)))
+ 		die("dwm: cannot open display");
+ 	checkotherwm();
++	XrmInitialize();
++	load_xresources();
+ 	setup();
+ #ifdef __OpenBSD__
+ 	if (pledge("stdio rpath proc exec", NULL) == -1)
