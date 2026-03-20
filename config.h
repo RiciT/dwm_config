@@ -147,6 +147,7 @@ static const char *voldown[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
                                 "-5%", NULL};
 static const char *volmute[] = {"pactl", "set-sink-mute", "@DEFAULT_SINK@",
                                 "toggle", NULL};
+static const char *screenshot[] = {"flameshot", "gui", NULL};
 
 /* Lockscreen command */
 static const char *lockscreen[] = {"slock", NULL};
@@ -161,6 +162,8 @@ static const Key keys[] = {
 
     /* Lockscreen: Mod + Shift + L */
     {MODKEY | ShiftMask, XK_l, spawn, {.v = lockscreen}},
+
+    {0, XK_Print, spawn, {.v = screenshot}},
 
     {MODKEY, XK_p, spawndmenu, {0}},
     {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
