@@ -36,8 +36,8 @@ static const char *altbarclass = "Polybar"; /* Alternate bar class name */
 static const char *alttrayname = "tray";    /* Polybar tray instance name */
 static const char *altbarcmd =
     "~/.config/polybar/launch.sh"; /* Polybar launch command */
-static char font[] = "monospace:size=10";
-static char dmenufont[] = "monospace:size=10";
+static char font[] = "Aptos:size=10";
+static char dmenufont[] = "LiterationMonoNerdFont-Bold:size=10";
 static const char *fonts[] = {font};
 static char normbgcolor[] = "#222222";
 static char normbordercolor[] = "#444444";
@@ -66,7 +66,6 @@ static const Rule rules[] = {
      */
     /* class      instance    title       tags mask     isfloating   monitor */
     {"Gimp", NULL, NULL, 0, 1, -1},
-    {"Doublecmd", NULL, NULL, 0, 0, -1},
 };
 
 /* layout(s) */
@@ -138,8 +137,31 @@ ResourcePref resources[] = {
     {"mfact", FLOAT, &mfact},
 };
 
+#include <X11/XF86keysym.h>
+/* Brightness and Volume commands */
+static const char *brightnessup[] = {"brightnessctl", "set", "+10%", NULL};
+static const char *brightnessdown[] = {"brightnessctl", "set", "10%-", NULL};
+static const char *volup[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                              "+5%", NULL};
+static const char *voldown[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                                "-5%", NULL};
+static const char *volmute[] = {"pactl", "set-sink-mute", "@DEFAULT_SINK@",
+                                "toggle", NULL};
+
+/* Lockscreen command */
+static const char *lockscreen[] = {"slock", NULL};
+
 static const Key keys[] = {
     /* modifier                     key        function        argument */
+    {0, XF86XK_MonBrightnessUp, spawn, {.v = brightnessup}},
+    {0, XF86XK_MonBrightnessDown, spawn, {.v = brightnessdown}},
+    {0, XF86XK_AudioRaiseVolume, spawn, {.v = volup}},
+    {0, XF86XK_AudioLowerVolume, spawn, {.v = voldown}},
+    {0, XF86XK_AudioMute, spawn, {.v = volmute}},
+
+    /* Lockscreen: Mod + Shift + L */
+    {MODKEY | ShiftMask, XK_l, spawn, {.v = lockscreen}},
+
     {MODKEY, XK_p, spawndmenu, {0}},
     {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
     {MODKEY, XK_b, togglebar, {0}},
