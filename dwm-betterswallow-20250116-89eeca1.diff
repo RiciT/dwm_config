@@ -1,5 +1,18 @@
---- dwm.c	2024-06-25 01:55:26.771203825 +0200
-+++ dwm.c	2025-01-16 21:07:02.942737362 +0100
+diff -up -x dwm -x '*.o' -x compile_commands.json dwm-6.3-orig/config.mk dwm-6.3/config.mk
+--- dwm-6.3-orig/config.mk	2024-06-25 01:55:26.769203813 +0200
++++ dwm-6.3/config.mk	2024-12-15 01:12:39.132847648 +0100
+@@ -24,6 +24,8 @@ FREETYPEINC = /usr/include/freetype2
+ INCS = -I${X11INC} -I${FREETYPEINC}
+ LIBS = -L${X11LIB} -lX11 ${XINERAMALIBS} ${FREETYPELIBS}
+ 
++LIBS += -lXRes
++
+ # flags
+ CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" ${XINERAMAFLAGS}
+ #CFLAGS   = -g -std=c99 -pedantic -Wall -O0 ${INCS} ${CPPFLAGS}
+diff -up -x dwm -x '*.o' -x compile_commands.json dwm-6.3-orig/dwm.c dwm-6.3/dwm.c
+--- dwm-6.3-orig/dwm.c	2024-06-25 01:55:26.771203825 +0200
++++ dwm-6.3/dwm.c	2025-01-16 21:07:02.942737362 +0100
 @@ -40,6 +40,7 @@
  #include <X11/extensions/Xinerama.h>
  #endif /* XINERAMA */
@@ -29,7 +42,20 @@
  	Client *next;
  	Client *snext;
  	Monitor *mon;
-@@ -266,6 +278,8 @@ static void (*handler[LASTEvent]) (XEven
+@@ -141,6 +147,12 @@ typedef struct {
+ 	int monitor;
+ } Rule;
+ 
++typedef struct SwallowDef {
++	pid_t pid;
++	Client *swallower;
++	struct SwallowDef *next;
++} SwallowDef;
++
+ /* function declarations */
+ static void applyrules(Client *c);
+ static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
+@@ -260,6 +272,8 @@ static void (*handler[LASTEvent]) (XEven
  	[PropertyNotify] = propertynotify,
  	[UnmapNotify] = unmapnotify
  };
@@ -38,7 +64,7 @@
  static Atom wmatom[WMLast], netatom[NetLast];
  static int running = 1;
  static Cur *cursor[CurLast];
-@@ -406,6 +420,69 @@ arrangemon(Monitor *m)
+@@ -400,6 +414,69 @@ arrangemon(Monitor *m)
  		m->lt[m->sellt]->arrange(m);
  }
  
@@ -108,7 +134,7 @@
  void
  attach(Client *c)
  {
-@@ -532,7 +609,15 @@ clientmessage(XEvent *e)
+@@ -526,7 +603,15 @@ clientmessage(XEvent *e)
  	} else if (cme->message_type == netatom[NetActiveWindow]) {
  		if (c != selmon->sel && !c->isurgent)
  			seturgent(c, 1);
@@ -124,7 +150,7 @@
  }
  
  void
-@@ -1058,6 +1143,7 @@ manage(Window w, XWindowAttributes *wa)
+@@ -1052,6 +1137,7 @@ manage(Window w, XWindowAttributes *wa)
  	c->y = MAX(c->y, ((c->mon->by == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
  		&& (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bh : c->mon->my);
  	c->bw = borderpx;
@@ -132,7 +158,7 @@
  
  	wc.border_width = c->bw;
  	XConfigureWindow(dpy, w, CWBorderWidth, &wc);
-@@ -1072,8 +1158,10 @@ manage(Window w, XWindowAttributes *wa)
+@@ -1066,8 +1152,10 @@ manage(Window w, XWindowAttributes *wa)
  		c->isfloating = c->oldstate = trans != None || c->isfixed;
  	if (c->isfloating)
  		XRaiseWindow(dpy, c->win);
@@ -145,7 +171,7 @@
  	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
  		(unsigned char *) &(c->win), 1);
  	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
-@@ -1170,6 +1258,10 @@ movemouse(const Arg *arg)
+@@ -1164,6 +1252,10 @@ movemouse(const Arg *arg)
  		case Expose:
  		case MapRequest:
  			handler[ev.type](&ev);
@@ -156,7 +182,7 @@
  			break;
  		case MotionNotify:
  			if ((ev.xmotion.time - lasttime) <= (1000 / 60))
-@@ -1324,6 +1416,9 @@ resizemouse(const Arg *arg)
+@@ -1318,6 +1410,9 @@ resizemouse(const Arg *arg)
  		case Expose:
  		case MapRequest:
  			handler[ev.type](&ev);
@@ -166,7 +192,7 @@
  			break;
  		case MotionNotify:
  			if ((ev.xmotion.time - lasttime) <= (1000 / 60))
-@@ -1572,6 +1667,7 @@ setup(void)
+@@ -1566,6 +1661,7 @@ setup(void)
  	netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
  	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
  	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
@@ -174,7 +200,7 @@
  	/* init cursors */
  	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
  	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
-@@ -1589,6 +1685,8 @@ setup(void)
+@@ -1583,6 +1679,8 @@ setup(void)
  		PropModeReplace, (unsigned char *) &wmcheckwin, 1);
  	XChangeProperty(dpy, wmcheckwin, netatom[NetWMName], utf8string, 8,
  		PropModeReplace, (unsigned char *) "dwm", 3);
@@ -183,7 +209,7 @@
  	XChangeProperty(dpy, root, netatom[NetWMCheck], XA_WINDOW, 32,
  		PropModeReplace, (unsigned char *) &wmcheckwin, 1);
  	/* EWMH support per view */
-@@ -1772,11 +1870,55 @@ unfocus(Client *c, int setfocus)
+@@ -1766,11 +1864,55 @@ unfocus(Client *c, int setfocus)
  }
  
  void
@@ -239,7 +265,7 @@
  	detach(c);
  	detachstack(c);
  	if (!destroyed) {
-@@ -1789,9 +1931,10 @@ unmanage(Client *c, int destroyed)
+@@ -1783,9 +1925,10 @@ unmanage(Client *c, int destroyed)
  		XSync(dpy, False);
  		XSetErrorHandler(xerror);
  		XUngrabServer(dpy);
