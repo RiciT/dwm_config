@@ -69,7 +69,7 @@ static const Rule rules[] = {
     /* class      instance    title       tags mask     isfloating   monitor
        scratch key */
     {"Gimp", NULL, NULL, 0, 1, -1, 0},
-    {NULL, NULL, "scratchpad", 0, 1, -1, 's'},
+    {"Gnome-calculator", NULL, "scratchpad", 0, 1, -1, 's'},
     SCRATCHTAGWIN_RULE(scratchtagwin1, 1),
     SCRATCHTAGWIN_RULE(scratchtagwin2, 2),
     SCRATCHTAGWIN_RULE(scratchtagwin3, 3),
@@ -143,7 +143,7 @@ SCRATCHTAGWIN(scratchtagwin8, 8);
 SCRATCHTAGWIN(scratchtagwin9, 9);
 
 /*First arg only serves to match against key in rules*/
-static const char *scratchpadcmd[] = {"f", "gnome-calculator", "-t",
+static const char *scratchpadcmd[] = {"s", "gnome-calculator", NULL,
                                       "scratchpad", NULL};
 
 /*
@@ -209,7 +209,7 @@ static const Key keys[] = {
                                            XK_0,
                                            makescratchtagwin,
                                            {.i = 0}},
-    {MODKEY | ShiftMask, XK_f, makescratchtagwin, {.i = 'f'}},
+    {MODKEY | Mod1Mask | ShiftMask, XK_s, makescratchtagwin, {.i = 's'}},
 
     {MODKEY, XK_b, togglebar, {0}},
     {MODKEY, XK_j, focusstack, {.i = +1}},
