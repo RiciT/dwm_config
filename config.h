@@ -69,7 +69,7 @@ static const Rule rules[] = {
     /* class      instance    title       tags mask     isfloating   monitor
        scratch key */
     {"Gimp", NULL, NULL, 0, 1, -1, 0},
-    {"Gnome-calculator", NULL, "scratchpad", 0, 1, -1, 's'},
+    {NULL, NULL, "scratchpad", 0, 1, -1, 's'},
     SCRATCHTAGWIN_RULE(scratchtagwin1, 1),
     SCRATCHTAGWIN_RULE(scratchtagwin2, 2),
     SCRATCHTAGWIN_RULE(scratchtagwin3, 3),
