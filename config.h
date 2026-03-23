@@ -57,7 +57,7 @@ static char *colorslight[][3] = {
 };
 
 /* tagging */
-static const char *tags[] = {"1", "2", "3", "4", "5"};
+static const char *tags[] = {"1", "2", "3", "4", "5", "6"};
 
 static const Rule rules[] = {
     /* xprop(1):
@@ -81,6 +81,8 @@ static const int refreshrate =
 #define FORCE_VSPLIT                                                           \
   1 /* nrowgrid layout: force two clients to always split vertically */
 #include "vanitygaps.c"
+
+static const float fgw = .6, fgh = .6;
 
 static const Layout layouts[] = {
     /* symbol     arrange function */
@@ -184,6 +186,7 @@ static const Key keys[] = {
     {MODKEY | ShiftMask, XK_r, setlayout, {.v = &layouts[3]}},
     {MODKEY, XK_m, setlayout, {.v = &layouts[4]}},
     {MODKEY, XK_space, setlayout, {0}},
+    {MODKEY | Mod4Mask, XK_space, togglefloating, {0}},
     {MODKEY | ShiftMask, XK_space, togglefloating, {0}},
     {MODKEY, XK_0, view, {.ui = ~0}},
     {MODKEY | ShiftMask, XK_0, tag, {.ui = ~0}},
