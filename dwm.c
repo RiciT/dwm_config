@@ -2546,6 +2546,7 @@ void altTabStart(const Arg *arg) {
 }
 
 void spawndmenu(const Arg *arg) {
+  xrdb(0);
   dmenumon[0] = '0' + selmon->num;
 
   if (arg->i == 0)
