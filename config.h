@@ -41,6 +41,17 @@ static char dmenufont[] = "JetBrainsMono-Bold:size=10";
 static const char *fonts[] = {font};
 
 #include "/home/tamas/.cache/wal/colors-wal-dwm-minimal.h"
+static char normbgcolor[] = "#222222";
+static char normbordercolor[] = "#444444";
+static char normfgcolor[] = "#bbbbbb";
+static char selfgcolor[] = "#eeeeee";
+static char selbordercolor[] = "#005577";
+static char selbgcolor[] = "#005577";
+static char *colors[][3] = {
+    /*               fg           bg           border   */
+    [SchemeNorm] = {normfgcolor, normbgcolor, normbordercolor},
+    [SchemeSel] = {selfgcolor, selbgcolor, selbordercolor},
+};
 
 static char dmenulines[] = "8";
 static char *colorsdark[][3] = {
@@ -106,13 +117,14 @@ static const Layout layouts[] = {
 /* commands */
 static char dmenumon[2] =
     "0"; /* component of dmenu{dark,light}, manipulated in spawndmenu() */
-static const char *dmenudark[] = {
-    "dmenu_run", "-m",  dmenumon, "-fn", dmenufont, "-nb", norm_bg,    "-nf",
-    norm_fg,     "-sb", sel_bg,   "-sf", sel_fg,    "-l",  dmenulines, NULL};
+static const char *dmenudark[] = {"dmenu_run", "-m",  dmenumon,    "-fn",
+                                  dmenufont,   "-nb", normbgcolor, "-nf",
+                                  normfgcolor, "-sb", selbgcolor,  "-sf",
+                                  selfgcolor,  "-l",  dmenulines,  NULL};
 static const char *dmenulight[] = {
-    "j4-wrapper", "-m",  dmenumon,   "-fn", dmenufont, "-nb",
-    norm_bg,      "-nf", norm_fg,    "-sb", sel_bg,    "-sf",
-    sel_fg,       "-l",  dmenulines, "-i",  NULL};
+    "j4-wrapper", "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
+    normbgcolor,  "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
+    selfgcolor,   "-l",  dmenulines,  "-i",  NULL};
 
 static const char *termcmd[] = {"terminator", NULL};
 
@@ -122,12 +134,12 @@ static const char *termcmd[] = {"terminator", NULL};
 ResourcePref resources[] = {
     {"font", STRING, &font},
     {"dmenufont", STRING, &dmenufont},
-    {"normbgcolor", STRING, &norm_bg},
-    {"normbordercolor", STRING, &norm_border},
-    {"normfgcolor", STRING, &norm_fg},
-    {"selbgcolor", STRING, &sel_bg},
-    {"selbordercolor", STRING, &sel_border},
-    {"selfgcolor", STRING, &sel_fg},
+    {"background", STRING, &normbgcolor},
+    {"color2", STRING, &normbordercolor},
+    {"foreground", STRING, &normfgcolor},
+    {"color4", STRING, &selbgcolor},
+    {"color3", STRING, &selbordercolor},
+    {"foreground", STRING, &selfgcolor},
     {"borderpx", INTEGER, &borderpx},
     {"snap", INTEGER, &snap},
     {"showbar", INTEGER, &showbar},
@@ -192,6 +204,7 @@ static const Key keys[] = {
     {MODKEY, XK_period, focusmon, {.i = +1}},
     {MODKEY | ShiftMask, XK_comma, tagmon, {.i = -1}},
     {MODKEY | ShiftMask, XK_period, tagmon, {.i = +1}},
+    {MODKEY, XK_F5, xrdb, {.v = NULL}},
     {Mod1Mask, XK_Tab, altTabStart, {.i = 1}},
     {Mod1Mask, XK_grave, altTabStart, {.i = 0}},
     TAGKEYS(XK_1, 0) TAGKEYS(XK_2, 1) TAGKEYS(XK_3, 2) TAGKEYS(XK_4, 3)
