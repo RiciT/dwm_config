@@ -1919,10 +1919,10 @@ void setcolormode(void) {
 
   if (access(path, F_OK) == 0) {
     scheme = schemelight;
-    dmenucmd = dmenulight;
+    // dmenucmd = dmenulight;
   } else {
     scheme = schemedark;
-    dmenucmd = dmenudark;
+    // dmenucmd = dmenudark;
   }
 }
 
@@ -2495,6 +2495,12 @@ void altTabStart(const Arg *arg) {
 
 void spawndmenu(const Arg *arg) {
   dmenumon[0] = '0' + selmon->num;
+
+  if (arg->i == 0)
+    dmenucmd = dmenudark;
+  else
+    dmenucmd = dmenulight;
+
   spawn(&(const Arg){.v = dmenucmd});
 }
 

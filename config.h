@@ -18,7 +18,7 @@ static const unsigned int maxWTab = 600; /* tab menu width */
 static const unsigned int maxHTab = 200; /* tab menu height */
 
 /* appearance */
-static const unsigned int borderpx = 1; /* border pixel of windows */
+static const unsigned int borderpx = 2; /* border pixel of windows */
 static const unsigned int gappx = 0;    /* gaps between windows */
 static const unsigned int snap = 32;    /* snap pixel */
 static const unsigned int gappih = 20;  /* horiz inner gap between windows */
@@ -37,23 +37,21 @@ static const char *alttrayname = "tray";    /* Polybar tray instance name */
 static const char *altbarcmd =
     "~/.config/polybar/launch_dwm.sh"; /* Polybar launch command */
 static char font[] = "Aptos:size=10";
-static char dmenufont[] = "LiterationMonoNerdFont-Bold:size=10";
+static char dmenufont[] = "JetBrainsMono-Bold:size=10";
 static const char *fonts[] = {font};
-static char normbgcolor[] = "#222222";
-static char normbordercolor[] = "#444444";
-static char normfgcolor[] = "#bbbbbb";
-static char selfgcolor[] = "#eeeeee";
-static char selbordercolor[] = "#005577";
-static char selbgcolor[] = "#005577";
+
+#include "/home/tamas/.cache/wal/colors-wal-dwm-minimal.h"
+
+static char dmenulines[] = "8";
 static char *colorsdark[][3] = {
     /*               fg           bg           border   */
-    [SchemeNorm] = {normfgcolor, normbgcolor, normbordercolor},
-    [SchemeSel] = {selfgcolor, selbgcolor, selbordercolor},
+    [SchemeNorm] = {norm_fg, norm_bg, norm_border},
+    [SchemeSel] = {sel_fg, sel_bg, sel_border},
 };
 static char *colorslight[][3] = {
     /*               fg           bg           border   */
-    [SchemeNorm] = {normfgcolor, normbgcolor, normbordercolor},
-    [SchemeSel] = {selfgcolor, selbgcolor, selbordercolor},
+    [SchemeNorm] = {norm_fg, norm_bg, norm_border},
+    [SchemeSel] = {sel_fg, sel_bg, sel_border},
 };
 
 /* tagging */
@@ -108,14 +106,13 @@ static const Layout layouts[] = {
 /* commands */
 static char dmenumon[2] =
     "0"; /* component of dmenu{dark,light}, manipulated in spawndmenu() */
-static const char *dmenudark[] = {"dmenu_run", "-m",  dmenumon,       "-fn",
-                                  dmenufont,   "-nb", normbgcolor,    "-nf",
-                                  normfgcolor, "-sb", selbordercolor, "-sf",
-                                  selfgcolor,  NULL};
-static const char *dmenulight[] = {"dmenu_run", "-m",  dmenumon,       "-fn",
-                                   dmenufont,   "-nb", normbgcolor,    "-nf",
-                                   normfgcolor, "-sb", selbordercolor, "-sf",
-                                   selfgcolor,  NULL};
+static const char *dmenudark[] = {
+    "dmenu_run", "-m",  dmenumon, "-fn", dmenufont, "-nb", norm_bg,    "-nf",
+    norm_fg,     "-sb", sel_bg,   "-sf", sel_fg,    "-l",  dmenulines, NULL};
+static const char *dmenulight[] = {
+    "j4-wrapper", "-m",  dmenumon,   "-fn", dmenufont, "-nb",
+    norm_bg,      "-nf", norm_fg,    "-sb", sel_bg,    "-sf",
+    sel_fg,       "-l",  dmenulines, "-i",  NULL};
 
 static const char *termcmd[] = {"terminator", NULL};
 
@@ -125,12 +122,12 @@ static const char *termcmd[] = {"terminator", NULL};
 ResourcePref resources[] = {
     {"font", STRING, &font},
     {"dmenufont", STRING, &dmenufont},
-    {"normbgcolor", STRING, &normbgcolor},
-    {"normbordercolor", STRING, &normbordercolor},
-    {"normfgcolor", STRING, &normfgcolor},
-    {"selbgcolor", STRING, &selbgcolor},
-    {"selbordercolor", STRING, &selbordercolor},
-    {"selfgcolor", STRING, &selfgcolor},
+    {"normbgcolor", STRING, &norm_bg},
+    {"normbordercolor", STRING, &norm_border},
+    {"normfgcolor", STRING, &norm_fg},
+    {"selbgcolor", STRING, &sel_bg},
+    {"selbordercolor", STRING, &sel_border},
+    {"selfgcolor", STRING, &sel_fg},
     {"borderpx", INTEGER, &borderpx},
     {"snap", INTEGER, &snap},
     {"showbar", INTEGER, &showbar},
@@ -168,7 +165,8 @@ static const Key keys[] = {
 
     {0, XK_Print, spawn, {.v = screenshot}},
 
-    {MODKEY, XK_p, spawndmenu, {0}},
+    {MODKEY, XK_p, spawndmenu, {.i = 1}},             // only desktop
+    {MODKEY | ShiftMask, XK_p, spawndmenu, {.i = 0}}, // normal
     {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
     {MODKEY, XK_b, togglebar, {0}},
     {MODKEY, XK_j, focusstack, {.i = +1}},
