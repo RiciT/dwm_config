@@ -40,7 +40,7 @@ static char font[] = "Aptos:size=10";
 static char dmenufont[] = "JetBrainsMono-Bold:size=10";
 static const char *fonts[] = {font};
 
-#include "/home/tamas/.cache/wal/colors-wal-dwm-minimal.h"
+#include "/home/br4mos/.cache/wal/colors-wal-dwm-minimal.h"
 static char normbgcolor[] = "#222222";
 static char normbordercolor[] = "#444444";
 static char normfgcolor[] = "#bbbbbb";
@@ -76,7 +76,7 @@ static const Rule rules[] = {
     /* class      instance    title       tags mask     isfloating  canfocus
        monitor */
     {"Gimp", NULL, NULL, 0, 1, 1, -1},
-    {"Conky", NULL, NULL, ~0, 1, 0, -1},
+    {"Conky", NULL, NULL, 0, 1, 0, -1},
 };
 
 /* layout(s) */
@@ -127,6 +127,11 @@ static const char *dmenulight[] = {
     "j4-wrapper", "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
     normbgcolor,  "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
     selfgcolor,   "-l",  dmenulines,  "-i",  NULL};
+
+static const char *clipcmd[] = {
+    "clipmenu",  "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
+    normbgcolor, "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
+    selfgcolor,  "-l",  dmenulines,  "-i",  NULL};
 
 static const char *termcmd[] = {"terminator", NULL};
 
@@ -182,6 +187,7 @@ static const Key keys[] = {
     {MODKEY, XK_p, spawndmenu, {.i = 1}},             // only desktop
     {MODKEY | ShiftMask, XK_p, spawndmenu, {.i = 0}}, // normal
     {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
+    {MODKEY, XK_v, spawn, {.v = clipcmd}},
     {MODKEY, XK_b, togglebar, {0}},
     {MODKEY, XK_j, focusstack, {.i = +1}},
     {MODKEY, XK_k, focusstack, {.i = -1}},
