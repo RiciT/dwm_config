@@ -117,6 +117,7 @@ static const Layout layouts[] = {
   }
 
 /* commands */
+/* Dmenu commands */
 static char dmenumon[2] =
     "0"; /* component of dmenu{dark,light}, manipulated in spawndmenu() */
 static const char *dmenudark[] = {"dmenu_run", "-m",  dmenumon,    "-fn",
@@ -133,7 +134,34 @@ static const char *clipcmd[] = {
     normbgcolor, "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
     selfgcolor,  "-l",  dmenulines,  "-i",  NULL};
 
+static const char *powermenucmd[] = {
+    "powermenu", "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
+    normbgcolor, "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
+    selfgcolor,  "-l",  dmenulines,  "-i",  NULL};
+
+/* Terminal command */
 static const char *termcmd[] = {"terminator", NULL};
+
+/* Brightness and Volume commands */
+static const char *brightnessup[] = {"/home/br4mos/.dwm/backlight.sh", "up",
+                                     NULL};
+static const char *brightnessdown[] = {"/home/br4mos/.dwm/backlight.sh", "down",
+                                       NULL};
+
+static const char *volup[] = {"/home/br4mos/.dwm/volume.sh", "up", NULL};
+static const char *voldown[] = {"/home/br4mos/.dwm/volume.sh", "down", NULL};
+static const char *volmute[] = {"/home/br4mos/.dwm/volume.sh", "mute", NULL};
+
+/* Screenshot */
+static const char *screenshot[] = {"flameshot", "gui", NULL};
+
+/* Music Player Control */
+static const char *playcmd[] = {"playerctl", "play-pause", NULL};
+static const char *nextcmd[] = {"playerctl", "next", NULL};
+static const char *prevcmd[] = {"playerctl", "previous", NULL};
+
+/* Lockscreen command */
+static const char *lockscreen[] = {"slock", NULL};
 
 /*
  * Xresources preferences to load at startup
@@ -157,37 +185,30 @@ ResourcePref resources[] = {
 };
 
 #include <X11/XF86keysym.h>
-/* Brightness and Volume commands */
-static const char *brightnessup[] = {"brightnessctl", "set", "+10%", NULL};
-static const char *brightnessdown[] = {"brightnessctl", "set", "10%-", NULL};
-static const char *volup[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                              "+5%", NULL};
-static const char *voldown[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                                "-5%", NULL};
-static const char *volmute[] = {"pactl", "set-sink-mute", "@DEFAULT_SINK@",
-                                "toggle", NULL};
-static const char *screenshot[] = {"flameshot", "gui", NULL};
-
-/* Lockscreen command */
-static const char *lockscreen[] = {"slock", NULL};
-
 static const Key keys[] = {
     /* modifier                     key        function        argument */
+    /* Brightness */
     {0, XF86XK_MonBrightnessUp, spawn, {.v = brightnessup}},
     {0, XF86XK_MonBrightnessDown, spawn, {.v = brightnessdown}},
+    /* Volume */
     {0, XF86XK_AudioRaiseVolume, spawn, {.v = volup}},
     {0, XF86XK_AudioLowerVolume, spawn, {.v = voldown}},
     {0, XF86XK_AudioMute, spawn, {.v = volmute}},
-
+    /* Media Control */
+    {0, XF86XK_AudioPlay, spawn, {.v = playcmd}},
+    {0, XF86XK_AudioNext, spawn, {.v = nextcmd}},
+    {0, XF86XK_AudioPrev, spawn, {.v = prevcmd}},
     /* Lockscreen: Mod + Shift + L */
     {MODKEY | ShiftMask, XK_l, spawn, {.v = lockscreen}},
-
+    /* Screenshot */
     {0, XK_Print, spawn, {.v = screenshot}},
-
+    /* Dmenu commands */
     {MODKEY, XK_p, spawndmenu, {.i = 1}},             // only desktop
     {MODKEY | ShiftMask, XK_p, spawndmenu, {.i = 0}}, // normal
-    {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
+    {MODKEY | ShiftMask, XK_s, spawn, {.v = powermenucmd}},
     {MODKEY, XK_v, spawn, {.v = clipcmd}},
+    /* Base */
+    {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
     {MODKEY, XK_b, togglebar, {0}},
     {MODKEY, XK_j, focusstack, {.i = +1}},
     {MODKEY, XK_k, focusstack, {.i = -1}},
