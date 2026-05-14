@@ -77,6 +77,7 @@ static const Rule rules[] = {
        monitor */
     {"Gimp", NULL, NULL, 0, 1, 1, -1},
     {"Conky", NULL, NULL, 0, 1, 0, -1},
+    {"Xcalendar", NULL, NULL, 0, 1, 1, -1},
 };
 
 /* layout(s) */
