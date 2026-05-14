@@ -18,7 +18,7 @@ static const unsigned int maxWTab = 600; /* tab menu width */
 static const unsigned int maxHTab = 200; /* tab menu height */
 
 /* appearance */
-static const unsigned int borderpx = 1; /* border pixel of windows */
+static const unsigned int borderpx = 2; /* border pixel of windows */
 static const unsigned int gappx = 0;    /* gaps between windows */
 static const unsigned int snap = 32;    /* snap pixel */
 static const unsigned int gappih = 20;  /* horiz inner gap between windows */
@@ -37,23 +37,32 @@ static const char *alttrayname = "tray";    /* Polybar tray instance name */
 static const char *altbarcmd =
     "~/.config/polybar/launch_dwm.sh"; /* Polybar launch command */
 static char font[] = "Aptos:size=10";
-static char dmenufont[] = "LiterationMonoNerdFont-Bold:size=10";
+static char dmenufont[] = "JetBrainsMono-Bold:size=10";
 static const char *fonts[] = {font};
+
+#include "/home/br4mos/.cache/wal/colors-wal-dwm-minimal.h"
 static char normbgcolor[] = "#222222";
 static char normbordercolor[] = "#444444";
 static char normfgcolor[] = "#bbbbbb";
 static char selfgcolor[] = "#eeeeee";
 static char selbordercolor[] = "#005577";
 static char selbgcolor[] = "#005577";
-static char *colorsdark[][3] = {
+static char *colors[][3] = {
     /*               fg           bg           border   */
     [SchemeNorm] = {normfgcolor, normbgcolor, normbordercolor},
     [SchemeSel] = {selfgcolor, selbgcolor, selbordercolor},
 };
+
+static char dmenulines[] = "8";
+static char *colorsdark[][3] = {
+    /*               fg           bg           border   */
+    [SchemeNorm] = {norm_fg, norm_bg, norm_border},
+    [SchemeSel] = {sel_fg, sel_bg, sel_border},
+};
 static char *colorslight[][3] = {
     /*               fg           bg           border   */
-    [SchemeNorm] = {normfgcolor, normbgcolor, normbordercolor},
-    [SchemeSel] = {selfgcolor, selbgcolor, selbordercolor},
+    [SchemeNorm] = {norm_fg, norm_bg, norm_border},
+    [SchemeSel] = {sel_fg, sel_bg, sel_border},
 };
 
 /* tagging */
@@ -64,8 +73,10 @@ static const Rule rules[] = {
      *	WM_CLASS(STRING) = instance, class
      *	WM_NAME(STRING) = title
      */
-    /* class      instance    title       tags mask     isfloating   monitor */
-    {"Gimp", NULL, NULL, 0, 1, -1},
+    /* class      instance    title       tags mask     isfloating  canfocus
+       monitor */
+    {"Gimp", NULL, NULL, 0, 1, 1, -1},
+    {"Conky", NULL, NULL, 0, 1, 0, -1},
 };
 
 /* layout(s) */
@@ -106,18 +117,51 @@ static const Layout layouts[] = {
   }
 
 /* commands */
+/* Dmenu commands */
 static char dmenumon[2] =
     "0"; /* component of dmenu{dark,light}, manipulated in spawndmenu() */
-static const char *dmenudark[] = {"dmenu_run", "-m",  dmenumon,       "-fn",
-                                  dmenufont,   "-nb", normbgcolor,    "-nf",
-                                  normfgcolor, "-sb", selbordercolor, "-sf",
-                                  selfgcolor,  NULL};
-static const char *dmenulight[] = {"dmenu_run", "-m",  dmenumon,       "-fn",
-                                   dmenufont,   "-nb", normbgcolor,    "-nf",
-                                   normfgcolor, "-sb", selbordercolor, "-sf",
-                                   selfgcolor,  NULL};
+static const char *dmenudark[] = {"dmenu_run", "-m",  dmenumon,    "-fn",
+                                  dmenufont,   "-nb", normbgcolor, "-nf",
+                                  normfgcolor, "-sb", selbgcolor,  "-sf",
+                                  selfgcolor,  "-l",  dmenulines,  NULL};
+static const char *dmenulight[] = {
+    "j4-wrapper", "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
+    normbgcolor,  "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
+    selfgcolor,   "-l",  dmenulines,  "-i",  NULL};
 
+static const char *clipcmd[] = {
+    "clipmenu",  "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
+    normbgcolor, "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
+    selfgcolor,  "-l",  dmenulines,  "-i",  NULL};
+
+static const char *powermenucmd[] = {
+    "powermenu", "-m",  dmenumon,    "-fn", dmenufont,  "-nb",
+    normbgcolor, "-nf", normfgcolor, "-sb", selbgcolor, "-sf",
+    selfgcolor,  "-l",  dmenulines,  "-i",  NULL};
+
+/* Terminal command */
 static const char *termcmd[] = {"terminator", NULL};
+
+/* Brightness and Volume commands */
+static const char *brightnessup[] = {"/home/br4mos/.dwm/backlight.sh", "up",
+                                     NULL};
+static const char *brightnessdown[] = {"/home/br4mos/.dwm/backlight.sh", "down",
+                                       NULL};
+
+static const char *volup[] = {"/home/br4mos/.dwm/volume.sh", "up", NULL};
+static const char *voldown[] = {"/home/br4mos/.dwm/volume.sh", "down", NULL};
+static const char *volmute[] = {"/home/br4mos/.dwm/volume.sh", "mute", NULL};
+
+/* Screenshot */
+static const char *screenshot[] = {"flameshot", "gui", NULL};
+
+/* Music Player Control */
+static const char *playcmd[] = {"playerctl", "play-pause", NULL};
+static const char *nextcmd[] = {"playerctl", "next", NULL};
+static const char *prevcmd[] = {"playerctl", "previous", NULL};
+
+/* Lockscreen command */
+static const char *lockscreen[] = {"slock", NULL};
 
 /*
  * Xresources preferences to load at startup
@@ -125,12 +169,12 @@ static const char *termcmd[] = {"terminator", NULL};
 ResourcePref resources[] = {
     {"font", STRING, &font},
     {"dmenufont", STRING, &dmenufont},
-    {"normbgcolor", STRING, &normbgcolor},
-    {"normbordercolor", STRING, &normbordercolor},
-    {"normfgcolor", STRING, &normfgcolor},
-    {"selbgcolor", STRING, &selbgcolor},
-    {"selbordercolor", STRING, &selbordercolor},
-    {"selfgcolor", STRING, &selfgcolor},
+    {"background", STRING, &normbgcolor},
+    {"color2", STRING, &normbordercolor},
+    {"foreground", STRING, &normfgcolor},
+    {"color4", STRING, &selbgcolor},
+    {"color3", STRING, &selbordercolor},
+    {"foreground", STRING, &selfgcolor},
     {"borderpx", INTEGER, &borderpx},
     {"snap", INTEGER, &snap},
     {"showbar", INTEGER, &showbar},
@@ -141,34 +185,29 @@ ResourcePref resources[] = {
 };
 
 #include <X11/XF86keysym.h>
-/* Brightness and Volume commands */
-static const char *brightnessup[] = {"brightnessctl", "set", "+10%", NULL};
-static const char *brightnessdown[] = {"brightnessctl", "set", "10%-", NULL};
-static const char *volup[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                              "+5%", NULL};
-static const char *voldown[] = {"pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                                "-5%", NULL};
-static const char *volmute[] = {"pactl", "set-sink-mute", "@DEFAULT_SINK@",
-                                "toggle", NULL};
-static const char *screenshot[] = {"flameshot", "gui", NULL};
-
-/* Lockscreen command */
-static const char *lockscreen[] = {"slock", NULL};
-
 static const Key keys[] = {
     /* modifier                     key        function        argument */
+    /* Brightness */
     {0, XF86XK_MonBrightnessUp, spawn, {.v = brightnessup}},
     {0, XF86XK_MonBrightnessDown, spawn, {.v = brightnessdown}},
+    /* Volume */
     {0, XF86XK_AudioRaiseVolume, spawn, {.v = volup}},
     {0, XF86XK_AudioLowerVolume, spawn, {.v = voldown}},
     {0, XF86XK_AudioMute, spawn, {.v = volmute}},
-
+    /* Media Control */
+    {0, XF86XK_AudioPlay, spawn, {.v = playcmd}},
+    {0, XF86XK_AudioNext, spawn, {.v = nextcmd}},
+    {0, XF86XK_AudioPrev, spawn, {.v = prevcmd}},
     /* Lockscreen: Mod + Shift + L */
     {MODKEY | ShiftMask, XK_l, spawn, {.v = lockscreen}},
-
+    /* Screenshot */
     {0, XK_Print, spawn, {.v = screenshot}},
-
-    {MODKEY, XK_p, spawndmenu, {0}},
+    /* Dmenu commands */
+    {MODKEY, XK_p, spawndmenu, {.i = 1}},             // only desktop
+    {MODKEY | ShiftMask, XK_p, spawndmenu, {.i = 0}}, // normal
+    {MODKEY | ShiftMask, XK_s, spawn, {.v = powermenucmd}},
+    {MODKEY, XK_v, spawn, {.v = clipcmd}},
+    /* Base */
     {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
     {MODKEY, XK_b, togglebar, {0}},
     {MODKEY, XK_j, focusstack, {.i = +1}},
@@ -194,6 +233,7 @@ static const Key keys[] = {
     {MODKEY, XK_period, focusmon, {.i = +1}},
     {MODKEY | ShiftMask, XK_comma, tagmon, {.i = -1}},
     {MODKEY | ShiftMask, XK_period, tagmon, {.i = +1}},
+    {MODKEY, XK_F5, xrdb, {.v = NULL}},
     {Mod1Mask, XK_Tab, altTabStart, {.i = 1}},
     {Mod1Mask, XK_grave, altTabStart, {.i = 0}},
     TAGKEYS(XK_1, 0) TAGKEYS(XK_2, 1) TAGKEYS(XK_3, 2) TAGKEYS(XK_4, 3)

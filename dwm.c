@@ -66,6 +66,27 @@
 #define HEIGHT(X) ((X)->h + 2 * (X)->bw + gappx)
 #define TAGMASK ((1 << LENGTH(tags)) - 1)
 #define TEXTW(X) (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define XRDB_LOAD_COLOR(R, V)                                                  \
+  if (XrmGetResource(xrdb, R, NULL, &type, &value) == True) {                  \
+    if (value.addr != NULL && strnlen(value.addr, 8) == 7 &&                   \
+        value.addr[0] == '#') {                                                \
+      int i = 1;                                                               \
+      for (; i <= 6; i++) {                                                    \
+        if (value.addr[i] < 48)                                                \
+          break;                                                               \
+        if (value.addr[i] > 57 && value.addr[i] < 65)                          \
+          break;                                                               \
+        if (value.addr[i] > 70 && value.addr[i] < 97)                          \
+          break;                                                               \
+        if (value.addr[i] > 102)                                               \
+          break;                                                               \
+      }                                                                        \
+      if (i == 7) {                                                            \
+        strncpy(V, value.addr, 7);                                             \
+        V[7] = '\0';                                                           \
+      }                                                                        \
+    }                                                                          \
+  }
 
 #define MWM_HINTS_FLAGS_FIELD 0
 #define MWM_HINTS_DECORATIONS_FIELD 2
@@ -144,8 +165,8 @@ struct Client {
   int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
   int bw, oldbw;
   unsigned int tags;
-  int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen,
-      isforegrounded;
+  int isfixed, isfloating, canfocus, isurgent, neverfocus, oldstate,
+      isfullscreen, isforegrounded;
 
   Client *swallower;
   Client *swallowed;
@@ -222,6 +243,7 @@ typedef struct {
   const char *title;
   unsigned int tags;
   int isfloating;
+  int canfocus;
   int monitor;
 } Rule;
 
@@ -280,6 +302,7 @@ static int handlexevent(struct epoll_event *ev);
 static void incnmaster(const Arg *arg);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
+static void loadxrdb(void);
 static void manage(Window w, XWindowAttributes *wa);
 static void managealtbar(Window win, XWindowAttributes *wa);
 static void managetray(Window win, XWindowAttributes *wa);
@@ -347,6 +370,7 @@ static int wmclasscontains(Window win, const char *class, const char *name);
 static int xerror(Display *dpy, XErrorEvent *ee);
 static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
+static void xrdb(const Arg *arg);
 static void zoom(const Arg *arg);
 static void load_xresources(void);
 static void resource_load(XrmDatabase db, char *name, enum resource_type rtype,
@@ -434,6 +458,7 @@ void applyrules(Client *c) {
 
   /* rule matching */
   c->isfloating = 0;
+  c->canfocus = 1;
   c->tags = 0;
   XGetClassHint(dpy, c->win, &ch);
   class = ch.res_class ? ch.res_class : broken;
@@ -445,6 +470,7 @@ void applyrules(Client *c) {
         (!r->class || strstr(class, r->class)) &&
         (!r->instance || strstr(instance, r->instance))) {
       c->isfloating = r->isfloating;
+      c->canfocus = r->canfocus;
       c->tags |= r->tags;
       for (m = mons; m && m->num != r->monitor; m = m->next)
         ;
@@ -1036,6 +1062,8 @@ void focus(Client *c) {
   if (selmon->sel && selmon->sel != c)
     unfocus(selmon->sel, 0);
   if (c) {
+    if (!c->canfocus)
+      return;
     if (c->mon != selmon)
       selmon = c->mon;
     if (c->isurgent)
@@ -1079,18 +1107,20 @@ void focusstack(const Arg *arg) {
   if (!selmon->sel || (selmon->sel->isfullscreen && lockfullscreen))
     return;
   if (arg->i > 0) {
-    for (c = selmon->sel->next; c && !ISVISIBLE(c); c = c->next)
+    for (c = selmon->sel->next; c && (!ISVISIBLE(c) || !c->canfocus);
+         c = c->next)
       ;
     if (!c)
-      for (c = selmon->clients; c && !ISVISIBLE(c); c = c->next)
+      for (c = selmon->clients; c && (!ISVISIBLE(c) || !c->canfocus);
+           c = c->next)
         ;
   } else {
     for (i = selmon->clients; i != selmon->sel; i = i->next)
-      if (ISVISIBLE(i))
+      if (ISVISIBLE(i) && i->canfocus)
         c = i;
     if (!c)
       for (; i; i = i->next)
-        if (ISVISIBLE(i))
+        if (ISVISIBLE(i) && i->canfocus)
           c = i;
   }
   if (c) {
@@ -1265,6 +1295,35 @@ void killclient(const Arg *arg) {
     XSetErrorHandler(xerror);
     XUngrabServer(dpy);
   }
+}
+
+void loadxrdb() {
+  Display *display;
+  char *resm;
+  XrmDatabase xrdb;
+  char *type;
+  XrmValue value;
+
+  display = XOpenDisplay(NULL);
+
+  if (display != NULL) {
+    resm = XResourceManagerString(display);
+
+    if (resm != NULL) {
+      xrdb = XrmGetStringDatabase(resm);
+
+      if (xrdb != NULL) {
+        XRDB_LOAD_COLOR("dwm.color2", normbordercolor);
+        XRDB_LOAD_COLOR("dwm.background", normbgcolor);
+        XRDB_LOAD_COLOR("dwm.foreground", normfgcolor);
+        XRDB_LOAD_COLOR("dwm.color3", selbordercolor);
+        XRDB_LOAD_COLOR("dwm.color4", selbgcolor);
+        XRDB_LOAD_COLOR("dwm.foreground", selfgcolor);
+      }
+    }
+  }
+
+  XCloseDisplay(display);
 }
 
 void manage(Window w, XWindowAttributes *wa) {
@@ -1919,10 +1978,10 @@ void setcolormode(void) {
 
   if (access(path, F_OK) == 0) {
     scheme = schemelight;
-    dmenucmd = dmenulight;
+    // dmenucmd = dmenulight;
   } else {
     scheme = schemedark;
-    dmenucmd = dmenudark;
+    // dmenucmd = dmenudark;
   }
 }
 
@@ -2494,7 +2553,14 @@ void altTabStart(const Arg *arg) {
 }
 
 void spawndmenu(const Arg *arg) {
+  xrdb(0);
   dmenumon[0] = '0' + selmon->num;
+
+  if (arg->i == 0)
+    dmenucmd = dmenudark;
+  else
+    dmenucmd = dmenulight;
+
   spawn(&(const Arg){.v = dmenucmd});
 }
 
@@ -3115,6 +3181,15 @@ int xerrorstart(Display *dpy, XErrorEvent *ee) {
   return -1;
 }
 
+void xrdb(const Arg *arg) {
+  loadxrdb();
+  int i;
+  for (i = 0; i < LENGTH(colors); i++)
+    scheme[i] = drw_scm_create(drw, colors[i], 3);
+  focus(NULL);
+  arrange(NULL);
+}
+
 void zoom(const Arg *arg) {
   Client *c = selmon->sel;
 
@@ -3186,6 +3261,7 @@ int main(int argc, char *argv[]) {
     die("dwm: cannot open display");
   checkotherwm();
   XrmInitialize();
+  loadxrdb();
   load_xresources();
   setup();
 #ifdef __OpenBSD__
