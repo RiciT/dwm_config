@@ -143,6 +143,10 @@ static const char *powermenucmd[] = {
 /* Terminal command */
 static const char *termcmd[] = {"terminator", NULL};
 
+static const char *calcmd[] = {"/home/br4mos/PERSONAL/Developing/CalendarX11/"
+                               "zig-out/bin/zig-ultralight-x11",
+                               NULL};
+
 /* Brightness and Volume commands */
 static const char *brightnessup[] = {"/home/br4mos/.dwm/backlight.sh", "up",
                                      NULL};
@@ -208,6 +212,8 @@ static const Key keys[] = {
     {MODKEY | ShiftMask, XK_p, spawndmenu, {.i = 0}}, // normal
     {MODKEY | ShiftMask, XK_s, spawn, {.v = powermenucmd}},
     {MODKEY, XK_v, spawn, {.v = clipcmd}},
+
+    {MODKEY, XK_g, spawn, {.v = calcmd}},
     /* Base */
     {MODKEY | ShiftMask, XK_Return, spawn, {.v = termcmd}},
     {MODKEY, XK_b, togglebar, {0}},
